@@ -1,0 +1,69 @@
+version: '3.9'
+
+services:
+  backend:
+    build:
+      context: ./Backend
+    container_name: backend7
+    ports:
+      - "3068:3068"
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      - PORT=3068
+      - PGUSER=postgres
+      - PGPASSWORD=admin123
+      - PGDATABASE=employee_db
+      - PGHOST=postgres
+      - PGPORT=5432
+    volumes:
+      - ./Backend/Uploads:/app/Uploads
+
+  frontend:
+    build:
+      context: ./Frontend
+    container_name: Frontend7
+    ports:
+      - "8120:80"
+    restart: always
+    depends_on:
+      - backend
+
+  hr:
+    build:
+      context: ./HR
+    container_name: HR7
+    ports:
+      - "8121:80"
+    restart: always
+    depends_on:
+      - backend
+
+  staff:
+    build:
+      context: ./Staff
+    container_name: Staff7
+    ports:
+      - "8122:80"
+    restart: always
+    depends_on:
+      - backend
+
+  postgres:
+    image: postgres:16
+    container_name: postgres7
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: employee_db
+    ports:
+      - "5068:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  pgdata:
+
