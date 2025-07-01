@@ -1,4 +1,4 @@
-CREATE TABLE onboarding_records (
+CREATE TABLE IF NOT EXISTS onboarding_records (
         id SERIAL PRIMARY KEY,
         emp_id VARCHAR(7) UNIQUE,
         full_name VARCHAR(50) NOT NULL,
