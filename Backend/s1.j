@@ -8,8 +8,7 @@ const multer = require('multer');
 const app = express();
 app.use(cors());
 app.use(express.json());
-// app.use('/uploads', express.static(path.join(__dirname', 'Uploads')));
-app.use('/api/uploads', express.static(path.join(__dirname, 'Uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'Uploads')));
 
 const pool = new Pool({
   user: 'postgres',
@@ -22,6 +21,7 @@ const pool = new Pool({
 async function createTable() {
   try {
     await pool.query(`
+
       CREATE TABLE IF NOT EXISTS onboarding_records (
         id SERIAL PRIMARY KEY,
         emp_id VARCHAR(7) UNIQUE,
@@ -49,8 +49,6 @@ async function createTable() {
         degree_certificate_path VARCHAR(255),
         experience_letter_name VARCHAR(255),
         experience_letter_path VARCHAR(255),
-        resume_file_name VARCHAR(255),
-        resume_file_path VARCHAR(255),
         ssc_institution VARCHAR(200) NOT NULL,
         ssc_year INTEGER NOT NULL CHECK (ssc_year >= 1900 AND ssc_year <= 2026),
         inter_institution VARCHAR(200) NOT NULL,
@@ -74,35 +72,9 @@ async function createTable() {
         updated_at TIMESTAMP WITH TIME ZONE
       );
     `);
-    console.log('Table onboarding_records ensured successfully');
+    console.log('Table onboarding_records dropped and recreated successfully');
   } catch (error) {
     console.error('Error creating table:', error.message);
-    process.exit(1);
-  }
-}
-
-async function migrateTable() {
-  try {
-    // Check if resume_file_name column exists
-    const columnCheck = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'onboarding_records' AND column_name = 'resume_file_name';
-    `);
-    
-    if (columnCheck.rows.length === 0) {
-      // Add resume_file_name and resume_file_path columns
-      await pool.query(`
-        ALTER TABLE onboarding_records
-        ADD COLUMN IF NOT EXISTS resume_file_name VARCHAR(255),
-        ADD COLUMN IF NOT EXISTS resume_file_path VARCHAR(255);
-      `);
-      console.log('Added resume_file_name and resume_file_path columns to onboarding_records');
-    } else {
-      console.log('resume_file_name column already exists, no migration needed');
-    }
-  } catch (error) {
-    console.error('Error migrating table:', error.message);
     process.exit(1);
   }
 }
@@ -127,7 +99,6 @@ pool.connect()
   .then(async () => {
     console.log('Connected to PostgreSQL database');
     await createTable();
-    await migrateTable();
   })
   .catch(err => {
     console.error('Database connection error:', err);
@@ -164,8 +135,7 @@ const upload = multer({
       sscCertificate: ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
       interCertificate: ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
       degreeCertificate: ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
-      experienceLetter: ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
-      resume: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+      experienceLetter: ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
     };
     if (allowedTypes[file.fieldname]?.includes(file.mimetype)) {
       cb(null, true);
@@ -179,8 +149,7 @@ const upload = multer({
   { name: 'sscCertificate', maxCount: 1 },
   { name: 'interCertificate', maxCount: 1 },
   { name: 'degreeCertificate', maxCount: 1 },
-  { name: 'experienceLetter', maxCount: 1 },
-  { name: 'resume', maxCount: 1 }
+  { name: 'experienceLetter', maxCount: 1 }
 ]);
 
 app.get('/api/health', (req, res) => {
@@ -211,75 +180,71 @@ app.post('/api/employees', (req, res, next) => {
         return value;
       };
 
-const result = await pool.query(
-  `INSERT INTO onboarding_records (
-    emp_id, full_name, email, phone, department, job_role, job_start_date,
-    street_address, city, state, zip_code, dob, status,
-    profile_pic_name, profile_pic_path, id_proof_name, id_proof_path,
-    ssc_certificate_name, ssc_certificate_path, inter_certificate_name, inter_certificate_path,
-    degree_certificate_name, degree_certificate_path, experience_letter_name, experience_letter_path,
-    resume_file_name, resume_file_path,
-    ssc_institution, ssc_year, inter_institution, inter_year, degree, institution, graduation_year,
-    bank_name, mobile_number, account_number, ifsc_number,
-    prev_company_name, prev_job_role, prev_employment_start, prev_employment_end,
-    emergency_contact_name, emergency_contact_relationship, emergency_contact_phone, emergency_contact_address,
-    created_at, updated_at
-  ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-    $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39,
-    $40, $41, $42, $43, $44, $45, $46, $47, $48
-  ) RETURNING id, emp_id`,
-  [
-    empId,
-    formData.fullName,
-    formData.email,
-    formData.phone,
-    formData.department,
-    formData.jobRole,
-    getDateValue(formData.jobStartDate),
-    formData.streetAddress,
-    formData.city,
-    formData.state,
-    formData.zipCode,
-    getDateValue(formData.dob),
-    'Pending',
-    req.files['profilePic'] ? req.files['profilePic'][0].originalname : null,
-    req.files['profilePic'] ? req.files['profilePic'][0].path : null,
-    req.files['idProof'] ? req.files['idProof'][0].originalname : null,
-    req.files['idProof'] ? req.files['idProof'][0].path : null,
-    req.files['sscCertificate'] ? req.files['sscCertificate'][0].originalname : null,
-    req.files['sscCertificate'] ? req.files['sscCertificate'][0].path : null,
-    req.files['interCertificate'] ? req.files['interCertificate'][0].originalname : null,
-    req.files['interCertificate'] ? req.files['interCertificate'][0].path : null,
-    req.files['degreeCertificate'] ? req.files['degreeCertificate'][0].originalname : null,
-    req.files['degreeCertificate'] ? req.files['degreeCertificate'][0].path : null,
-    req.files['experienceLetter'] ? req.files['experienceLetter'][0].originalname : null,
-    req.files['experienceLetter'] ? req.files['experienceLetter'][0].path : null,
-    req.files['resume'] ? req.files['resume'][0].originalname : null,
-    req.files['resume'] ? req.files['resume'][0].path : null,
-    formData.sscInstitution,
-    formData.sscYear,
-    formData.interInstitution,
-    formData.interYear,
-    formData.degree,
-    formData.institution,
-    formData.graduationYear,
-    formData.bankName,
-    formData.mobileNumber,
-    formData.accountNumber,
-    formData.ifscNumber,
-    formData.prevCompanyName || null,
-    formData.prevJobRole || null,
-    getDateValue(formData.prevEmploymentStart),
-    getDateValue(formData.prevEmploymentEnd),
-    formData.emergencyContactName,
-    formData.emergencyContactRelationship,
-    formData.emergencyContactPhone,
-    formData.emergencyContactAddress,
-    new Date().toISOString(),
-    null // Set updated_at to NULL for the initial insert
-  ]
-);
+      const result = await pool.query(
+        `INSERT INTO onboarding_records (
+          emp_id, full_name, email, phone, department, job_role, job_start_date,
+          street_address, city, state, zip_code, dob, status,
+          profile_pic_name, profile_pic_path, id_proof_name, id_proof_path,
+          ssc_certificate_name, ssc_certificate_path, inter_certificate_name, inter_certificate_path,
+          degree_certificate_name, degree_certificate_path, experience_letter_name, experience_letter_path,
+          ssc_institution, ssc_year, inter_institution, inter_year, degree, institution, graduation_year,
+          bank_name, mobile_number, account_number, ifsc_number,
+          prev_company_name, prev_job_role, prev_employment_start, prev_employment_end,
+          emergency_contact_name, emergency_contact_relationship, emergency_contact_phone, emergency_contact_address,
+          created_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+          $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39,
+          $40, $41, $42, $43, $44, $45
+        ) RETURNING id, emp_id`,
+        [
+          empId,
+          formData.fullName,
+          formData.email,
+          formData.phone,
+          formData.department,
+          formData.jobRole,
+          getDateValue(formData.jobStartDate),
+          formData.streetAddress,
+          formData.city,
+          formData.state,
+          formData.zipCode,
+          getDateValue(formData.dob),
+          'Pending',
+          req.files['profilePic'] ? req.files['profilePic'][0].originalname : null,
+          req.files['profilePic'] ? req.files['profilePic'][0].path : null,
+          req.files['idProof'] ? req.files['idProof'][0].originalname : null,
+          req.files['idProof'] ? req.files['idProof'][0].path : null,
+          req.files['sscCertificate'] ? req.files['sscCertificate'][0].originalname : null,
+          req.files['sscCertificate'] ? req.files['sscCertificate'][0].path : null,
+          req.files['interCertificate'] ? req.files['interCertificate'][0].originalname : null,
+          req.files['interCertificate'] ? req.files['interCertificate'][0].path : null,
+          req.files['degreeCertificate'] ? req.files['degreeCertificate'][0].originalname : null,
+          req.files['degreeCertificate'] ? req.files['degreeCertificate'][0].path : null,
+          req.files['experienceLetter'] ? req.files['experienceLetter'][0].originalname : null,
+          req.files['experienceLetter'] ? req.files['experienceLetter'][0].path : null,
+          formData.sscInstitution,
+          formData.sscYear,
+          formData.interInstitution,
+          formData.interYear,
+          formData.degree,
+          formData.institution,
+          formData.graduationYear,
+          formData.bankName,
+          formData.mobileNumber,
+          formData.accountNumber,
+          formData.ifscNumber,
+          formData.prevCompanyName || null,
+          formData.prevJobRole || null,
+          getDateValue(formData.prevEmploymentStart),
+          getDateValue(formData.prevEmploymentEnd),
+          formData.emergencyContactName,
+          formData.emergencyContactRelationship,
+          formData.emergencyContactPhone,
+          formData.emergencyContactAddress,
+          new Date().toISOString()
+        ]
+      );
       console.log('Insert result:', result.rows[0]);
       return res.status(201).json({
         message: 'Employee onboarding form submitted successfully',
@@ -376,14 +341,6 @@ app.get('/api/employees/active', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch active employees' });
   }
 });
-app.get('/api/uploads/:filename', (req, res) => {
-  const filePath = path.join(__dirname, 'Uploads', req.params.filename);
-  if (fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-  } else {
-    res.status(404).send('File not found');
-  }
-});
 
 app.get('/api/onboarding/:id/file/:field', async (req, res) => {
   try {
@@ -394,8 +351,7 @@ app.get('/api/onboarding/:id/file/:field', async (req, res) => {
       sscCertificate: { path: 'ssc_certificate_path', name: 'ssc_certificate_name' },
       interCertificate: { path: 'inter_certificate_path', name: 'inter_certificate_name' },
       degreeCertificate: { path: 'degree_certificate_path', name: 'degree_certificate_name' },
-      experienceLetter: { path: 'experience_letter_path', name: 'experience_letter_name' },
-      resume: { path: 'resume_file_path', name: 'resume_file_name' }
+      experienceLetter: { path: 'experience_letter_path', name: 'experience_letter_name' }
     };
 
     const dbField = fieldMap[field];
@@ -467,5 +423,5 @@ function getMimeType(fileName) {
 
 const PORT = process.env.PORT || 3068;
 app.listen(PORT, () => {
-  console.log(`Server running on http://16.171.19.248:${PORT}`);
+  console.log(`Server running on http://56.228.30.54:${PORT}`);
 });
