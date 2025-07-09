@@ -1043,7 +1043,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (form.experienceLetter.files[0]) formData.append('experienceLetter', form.experienceLetter.files[0]);
 
     try {
-      const response = await fetch('http://16.171.19.248:3068/api/employees', {
+      const response = await fetch('http://13.60.234.162:3068/api/employees', {
         method: 'POST',
         body: formData
       });
